@@ -21,6 +21,13 @@ jobs:
           chmod +x gradlew
           sed -i '' 's/networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
           for i in 1 2 3 4; do ./gradlew --version && break || sleep 15; done
+      - name: Download dependencies and compile Kotlin (with retries)
+        run: |
+          for i in 1 2 3 4; do
+            ./gradlew :shared:compileKotlinIosSimulatorArm64 --no-daemon && exit 0
+            echo "Attempt $i failed, retrying in 30s"; sleep 30
+          done
+          exit 1
       - name: Generate Xcode project
         run: cd iosApp && xcodegen generate
       - name: Build for iOS Simulator
