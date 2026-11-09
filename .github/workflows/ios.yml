@@ -14,12 +14,13 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: aletheia-ios/aletheia-ios
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Prepare Gradle wrapper
+        run: |
+          chmod +x gradlew
+          sed -i '' 's/networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
+          for i in 1 2 3 4; do ./gradlew --version && break || sleep 15; done
       - name: Generate Xcode project
         run: cd iosApp && xcodegen generate
       - name: Build for iOS Simulator
