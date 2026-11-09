@@ -44,7 +44,7 @@ jobs:
           (ios / "core").mkdir(parents=True, exist_ok=True)
           (ios / "core/IoDispatcher.ios.kt").write_text(
               "package com.nexus.music.core\n\nimport kotlinx.coroutines.CoroutineDispatcher\nimport kotlinx.coroutines.Dispatchers\n\n"
-              "internal actual fun ioDispatcher(): CoroutineDispatcher = Dispatchers.IO\n", encoding="utf-8")
+              "internal actual fun ioDispatcher(): CoroutineDispatcher = Dispatchers.Default\n", encoding="utf-8")
           print("patched")
           PY
       - name: Download dependencies and compile Kotlin
