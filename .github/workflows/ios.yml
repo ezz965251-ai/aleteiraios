@@ -21,11 +21,39 @@ jobs:
           chmod +x gradlew
           sed -i '' 's/networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
           for i in 1 2 3 4; do ./gradlew --version && break || sleep 15; done
-      - name: Download dependencies and compile Kotlin (with retries)
+      - name: Patch sources for iOS
         run: |
-          for i in 1 2 3 4; do
-            ./gradlew :shared:compileKotlinIosSimulatorArm64 --no-daemon && exit 0
-            echo "Attempt $i failed, retrying in 30s"; sleep 30
+          python3 - <<'PY'
+          import pathlib, re
+          base = pathlib.Path("shared/src")
+          common = base / "commonMain/kotlin/com/nexus/music"
+          ios = base / "iosMain/kotlin/com/nexus/music"
+          for rel in ["core/DeviceLockGate.kt", "playback/StyleDsp.kt", "ui/FrameCap.kt"]:
+              p = common / rel
+              t = p.read_text(encoding="utf-8")
+              if "import kotlin.concurrent.Volatile" not in t:
+                  t = re.sub(r"^(package [^\n]+\n)", r"\1\nimport kotlin.concurrent.Volatile\n", t, count=1, flags=re.M)
+                  p.write_text(t, encoding="utf-8")
+          p = common / "core/NexusDispatchers.kt"
+          t = p.read_text(encoding="utf-8")
+          t = t.replace("= Dispatchers.IO,", "= ioDispatcher(),")
+          p.write_text(t, encoding="utf-8")
+          (common / "core/IoDispatcher.kt").write_text(
+              "package com.nexus.music.core\n\nimport kotlinx.coroutines.CoroutineDispatcher\n\n"
+              "internal expect fun ioDispatcher(): CoroutineDispatcher\n", encoding="utf-8")
+          (ios / "core").mkdir(parents=True, exist_ok=True)
+          (ios / "core/IoDispatcher.ios.kt").write_text(
+              "package com.nexus.music.core\n\nimport kotlinx.coroutines.CoroutineDispatcher\nimport kotlinx.coroutines.Dispatchers\n\n"
+              "internal actual fun ioDispatcher(): CoroutineDispatcher = Dispatchers.IO\n", encoding="utf-8")
+          print("patched")
+          PY
+      - name: Download dependencies and compile Kotlin
+        run: |
+          for i in 1 2 3; do
+            ./gradlew :shared:compileKotlinIosSimulatorArm64 --no-daemon 2>&1 | tee build.log
+            if [ "${PIPESTATUS[0]}" -eq 0 ]; then exit 0; fi
+            if grep -q "^e: " build.log; then echo "Compilation errors, not retrying"; exit 1; fi
+            echo "Network problem, retry $i"; sleep 30
           done
           exit 1
       - name: Generate Xcode project
